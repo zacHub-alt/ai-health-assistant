@@ -4,3 +4,4 @@ transformers
 langdetect
 speechrecognition
 torch
+sacremoses
