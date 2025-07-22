@@ -1,0 +1,6 @@
+streamlit
+pillow
+transformers
+langdetect
+speechrecognition
+torch
