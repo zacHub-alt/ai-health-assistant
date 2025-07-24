@@ -1,62 +1,114 @@
-from langdetect import detect
-from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
-from transformers import M2M100ForConditionalGeneration, M2M100Tokenizer
-import torch
+import os
+import pandas as pd
+import ast
+import difflib
+from groq import Groq
+import requests
+import streamlit as st
 
-# Load medGPT (local or HuggingFace model)
-tokenizer_medgpt = AutoTokenizer.from_pretrained("microsoft/biogpt")
-model_medgpt = AutoModelForCausalLM.from_pretrained("microsoft/biogpt")
-med_pipe = pipeline("text-generation", model=model_medgpt, tokenizer=tokenizer_medgpt)
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-# Load NLLB translation model
-translation_model = M2M100ForConditionalGeneration.from_pretrained("facebook/nllb-200-distilled-600M")
-translation_tokenizer = M2M100Tokenizer.from_pretrained("facebook/nllb-200-distilled-600M")
-
-def detect_language(text):
-    try:
-        lang = detect(text)
-        return lang
-    except:
-        return "en"
-
-def translate_to_english(text, source_lang_code):
-    try:
-        translation_tokenizer.src_lang = source_lang_code
-        encoded = translation_tokenizer(text, return_tensors="pt")
-        generated_tokens = translation_model.generate(**encoded, forced_bos_token_id=translation_tokenizer.get_lang_id("eng"))
-        translated = translation_tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
-        return translated
-    except:
-        return text
-
-def translate_from_english(text, target_lang_code):
-    try:
-        translation_tokenizer.src_lang = "eng"
-        encoded = translation_tokenizer(text, return_tensors="pt")
-        generated_tokens = translation_model.generate(**encoded, forced_bos_token_id=translation_tokenizer.get_lang_id(target_lang_code))
-        translated = translation_tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
-        return translated
-    except:
-        return text
-
-def get_medical_response(user_input):
-    output = med_pipe(user_input, max_length=80, do_sample=True)[0]['generated_text']
-    return output
-
-def process_symptom_text(user_input):
-    detected_lang = detect_language(user_input)
-    print(f"Detected language: {detected_lang}")
-
-    if detected_lang != "en":
-        user_input_en = translate_to_english(user_input, detected_lang)
+# Load different grounding datasets
+def load_grounding_data(source="usmle"):
+    if source == "usmle":
+        path = os.path.join("data", "MedQA-USMLE-4-options-train.csv")
+        df = pd.read_csv(path)
+        df = df[["question", "answer_words", "options", "correct_answer"]].dropna()
+        df["options_parsed"] = df["options"].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else {})
+    elif source == "afri":
+        path = os.path.join("data", "afri_med_qa_15k_v2.5_phase_2_15275.csv")
+        df = pd.read_csv(path)
+        df = df.rename(columns={"question_clean": "question", "answer_rationale": "answer_words"})
+        df["options_parsed"] = None
+        df["correct_answer"] = ""
     else:
-        user_input_en = user_input
+        raise ValueError("Unknown dataset selected")
+    return df
 
-    med_response_en = get_medical_response(user_input_en)
+# Get top-N similar examples based on text similarity
+def get_contextual_examples(df, user_input, n=3):
+    df = df.copy()
+    df["similarity"] = df["question"].apply(
+        lambda q: difflib.SequenceMatcher(None, q.lower(), user_input.lower()).ratio()
+    )
+    top = df.sort_values("similarity", ascending=False).head(n)
+    return "\n\n".join([
+        f"Example Symptom: {row['question']}\nAdvice Given: {row['answer_words']}"
+        for _, row in top.iterrows()
+    ])
 
-    if detected_lang != "en":
-        final_response = translate_from_english(med_response_en, detected_lang)
-    else:
-        final_response = med_response_en
+# Use Google Places API to find nearby places
+def find_nearby_places(location, keyword="pharmacy"):
+    api_key = os.getenv("GOOGLE_MAPS_API_KEY")
+    fallback = [{"name": "Default Location", "lat": 6.5244, "lng": 3.3792}]  # Lagos fallback
 
-    return final_response
+    try:
+        lat, lng = location["lat"], location["lng"]
+        places_url = (
+            f"https://maps.googleapis.com/maps/api/place/nearbysearch/json?"
+            f"location={lat},{lng}&radius=3000&keyword={keyword}&key={api_key}"
+        )
+        places_res = requests.get(places_url).json()
+
+        places = [
+            {
+                "name": place["name"],
+                "lat": place["geometry"]["location"]["lat"],
+                "lng": place["geometry"]["location"]["lng"]
+            }
+            for place in places_res.get("results", [])
+        ]
+
+        return places if places else fallback
+
+    except Exception as e:
+        print(f"Place lookup error: {e}")
+        return fallback
+
+# Final model inference logic
+def process_symptom_text(user_input: str, dataset="usmle") -> tuple:
+    """
+    Process the user symptom input and return AI-generated advice and optional medication guidance.
+    Works with multiple datasets (e.g. 'usmle', 'afri') and gives safe, simple responses in a conversational tone.
+    """
+
+    grounding_df = load_grounding_data(dataset)
+    few_shot = get_contextual_examples(grounding_df, user_input, n=3)
+
+    prompt = f"""
+You are a compassionate rural health assistant supporting patients in Nigeria, especially in remote areas.
+
+When someone shares their symptoms with you:
+
+1. Start with a warm, simple tone — be caring and friendly.
+2. If the symptoms strongly suggest a likely illness (e.g. malaria, flu, typhoid), say it **might be** that, clearly stating it is not a confirmed diagnosis.
+3. Ask **1–2 short follow-up questions** to understand better.
+4. Give **practical advice** using everyday language — for example, rest, hydration, what to eat, or home remedies that are commonly available.
+5. If safe, suggest **basic over-the-counter meds** (like paracetamol or ORS), **only after** asking your follow-up questions.
+6. End with a **gentle reminder** to visit a clinic or health worker if things don’t improve or get worse.
+
+❌ Avoid technical medical terms.
+❌ Never give a final diagnosis.
+✅ Always aim to guide and support safely, like a trusted local health assistant.
+
+Here are some sample cases for inspiration (use only for tone and style):
+{few_shot}
+Patient says:
+"{user_input}"
+
+Your response:
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model="llama3-8b-8192",
+            messages=[{"role": "user", "content": prompt.strip()}],
+            temperature=0.5,
+            max_tokens=500
+        )
+
+        message = response.choices[0].message.content.strip()
+        return message, []  # <- Now always returning a tuple
+
+    except Exception as e:
+        return f"⚠️ Error generating response: {e}", []

@@ -1,7 +1,9 @@
 streamlit
-pillow
-transformers
+streamlit-webrtc
+groq
 langdetect
-speechrecognition
-torch
-sacremoses
+SpeechRecognition
+pillow
+streamlit-mic-recorder
+av
+streamlit_audiorec 
