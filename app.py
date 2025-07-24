@@ -54,7 +54,6 @@ if submit_text and user_input:
         st.session_state["map_results"] = top_pharmacies
         if top_pharmacies:
             st.session_state["location_coords"] = (top_pharmacies[0]["lat"], top_pharmacies[0]["lng"])
-
 # --- Voice Input ---
 st.subheader("🎤 Or Record Your Voice")
 audio = mic_recorder(start_prompt="🎙️ Start Recording", stop_prompt="⏹️ Stop Recording", key="voice_input")
@@ -70,31 +69,43 @@ if audio:
                     tmp_audio.write(audio['bytes'])
                     tmp_path = tmp_audio.name
 
-                headers = {"Authorization": f"Bearer {st.secrets.get('GROQ_API_KEY', 'YOUR_FALLBACK_KEY')}"}
-                files = {"file": open(tmp_path, "rb"), "model": (None, "whisper-large-v3")}
-                response = requests.post("https://api.groq.com/openai/v1/audio/transcriptions", headers=headers, files=files)
+                headers = {
+                    "Authorization": f"Bearer {st.secrets.get('GROQ_API_KEY', 'YOUR_FALLBACK_KEY')}"
+                }
+                files = {
+                    "file": open(tmp_path, "rb"),
+                    "model": (None, "whisper-large-v3")
+                }
+
+                response = requests.post(
+                    "https://api.groq.com/openai/v1/audio/transcriptions",
+                    headers=headers,
+                    files=files
+                )
 
                 if response.status_code == 200:
                     text = response.json().get("text", "")
                     st.markdown(f"🗣️ **You said:** `{text}`")
 
-                    if text:
+                    if text and "ai_response" not in st.session_state:
                         with st.spinner("🔬 Analyzing symptoms..."):
                             result, top_pharmacies = process_symptom_text(text, dataset=dataset_choice)
-                            st.success(result)
                             st.session_state["ai_response"] = result
-                            # ✅ Show the stored result if it exists (even after rerun)
-                            if "ai_response" in st.session_state:
-                              st.markdown("💡 **AI Advice:**")
-                              st.success(st.session_state["ai_response"])
-                    else:
-                              st.error(f"❌ Transcription failed: {response.text}")
+                    elif not text:
+                        st.warning("⚠️ No speech detected.")
 
-                           # ✅ Handle any unexpected errors
+                else:
+                    st.error(f"❌ Transcription failed: {response.text}")
+
             except Exception as e:
-              st.error(f"🚨 Error during transcription: {e}")
+                st.error(f"🚨 Error during transcription: {e}")
 
-# ✅ Clear and rerun on retake
+# ✅ Show the AI response if stored (even after rerun)
+if "ai_response" in st.session_state:
+    st.markdown("💡 **AI Advice:**")
+    st.success(st.session_state["ai_response"])
+
+# 🔁 Retake recording: clears AI result and re-runs app
 if st.button("🔁 Retake Recording"):
     st.session_state.pop("ai_response", None)
     st.rerun()
