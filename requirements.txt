@@ -9,3 +9,4 @@ av
 folium
 streamlit-folium
 streamlit_audiorec 
+streamlit-javascript
