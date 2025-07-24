@@ -83,12 +83,20 @@ if audio:
                             result, top_pharmacies = process_symptom_text(text, dataset=dataset_choice)
                             st.success(result)
                             st.session_state["ai_response"] = result
-                else:
-                    st.error(f"❌ Transcription failed: {response.text}")
-            except Exception as e:
-                st.error(f"🚨 Error during transcription: {e}")
+                            # ✅ Show the stored result if it exists (even after rerun)
+                            if "ai_response" in st.session_state:
+                              st.markdown("💡 **AI Advice:**")
+                              st.success(st.session_state["ai_response"])
+                    else:
+                              st.error(f"❌ Transcription failed: {response.text}")
 
+                           # ✅ Handle any unexpected errors
+            except Exception as e:
+              st.error(f"🚨 Error during transcription: {e}")
+
+# ✅ Clear and rerun on retake
 if st.button("🔁 Retake Recording"):
+    st.session_state.pop("ai_response", None)
     st.rerun()
 
 # --- Image Input ---
