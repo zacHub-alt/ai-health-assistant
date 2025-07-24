@@ -7,4 +7,5 @@ pillow
 streamlit-mic-recorder
 av
 folium
+streamlit-folium
 streamlit_audiorec 
