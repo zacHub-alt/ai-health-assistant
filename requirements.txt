@@ -6,4 +6,5 @@ SpeechRecognition
 pillow
 streamlit-mic-recorder
 av
+folium
 streamlit_audiorec 
