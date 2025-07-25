@@ -181,17 +181,16 @@ if image:
                     "home care steps, and whether they need to see a doctor. Use clear and medically sound guidance. Do not ask follow-up questions."
                  )
                  medgpt_response, _ = process_symptom_text(advice_prompt)
-                 st.session_state
-["image_response"] = result
-                 st.success(medgpt_response)
+    st.session_state["image_response"] = medgpt_response
+    st.success(medgpt_response)
 
+except Exception as e:
+    st.error(f"🚫 Detection failed: {e}")
 
-        except Exception as e:
-            st.error(f"🚫 Detection failed: {e}")
-if st.session_state["image_response"] = medgpt_response
-   if st.button("🔊Read Aloud", Key="read_image"):
-       speak_text(st.session_state["image_response])
-
+# Button to read aloud
+if "image_response" in st.session_state and st.session_state["image_response"]:
+    if st.button("🔊 Read Aloud", key="read_image"):
+        speak_text(st.session_state["image_response"])
 
 # --- Single Final Map ---
 st.markdown("### 🗺️ Nearby Medical Help")
