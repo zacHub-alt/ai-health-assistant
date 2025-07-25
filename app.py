@@ -12,7 +12,10 @@ from utils.image_inference import detect_skin_condition
 
 from streamlit_javascript import st_javascript
 
+
+# ---------- CONFIG ----------
 st.set_page_config(page_title="AI Health Assistant", layout="centered")
+st.title("🩺 AI Health Assistant")
 
 # ---------- LANGUAGE / TTS ----------
 def speak_text(text):
@@ -68,7 +71,6 @@ user_location = (lat, lng)  # fallback: Lagos
 st.session_state.setdefault("user_coords", {"lat": user_location[0], "lng": user_location[1]})
 st.session_state.setdefault("show_map", True)
 
-st.title("🩺 AI Health Assistant")
 
 # --- Dataset Selector ---
 dataset_choice = st.selectbox("Reference Dataset (optional)", ["usmle", "afri"])
@@ -85,7 +87,11 @@ if submit_text and user_input:
         st.markdown("### 💡 AI Advice from Text Input")
         st.success(result)
 
-        st.session_state["ai_response"] = result
+        st.session_state["text_response"] = result
+
+if st.session_state.get("text_response"):
+    if st.button("🔊 Read Aloud", key="read_text"):
+        speak_text(st.session_state["text_response"])  
 
 
 
@@ -125,7 +131,7 @@ if audio:
                     if text:
                         with st.spinner("🔬 Analyzing symptoms..."):
                             result, _ = process_symptom_text(text, dataset=dataset_choice)
-                            st.session_state["ai_response"] = result
+                            st.session_state["voice_response"] = result
                             st.markdown("💡 **AI Advice from Voice Input:**")
                             st.success(result)
                     else:
@@ -135,6 +141,10 @@ if audio:
 
             except Exception as e:
                 st.error(f"🚨 Error during transcription: {e}")
+
+if st.session_state.get("voice_response"):
+    if st.button("🔊 Read Aloud", key="read_voice"):
+        speak_text(st.session_state["voice_response"])
 
 # 🔁 Retake recording: clears AI result and re-runs app
 if st.button("🔁 Retake Recording"):
@@ -171,11 +181,16 @@ if image:
                     "home care steps, and whether they need to see a doctor. Use clear and medically sound guidance. Do not ask follow-up questions."
                  )
                  medgpt_response, _ = process_symptom_text(advice_prompt)
+                 st.session_state
+["image_response"] = result
                  st.success(medgpt_response)
 
 
         except Exception as e:
             st.error(f"🚫 Detection failed: {e}")
+if st.session_state["image_response"] = medgpt_response
+   if st.button("🔊Read Aloud", Key="read_image"):
+       speak_text(st.session_state["image_response])
 
 
 # --- Single Final Map ---
