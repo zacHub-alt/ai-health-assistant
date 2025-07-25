@@ -6,7 +6,7 @@ from groq import Groq
 import requests
 import streamlit as st
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+client = Groq(api_key=st.secrets.get("GROQ_API_KEY"))
 
 # Load different grounding datasets
 def load_grounding_data(source="usmle"):
@@ -77,6 +77,7 @@ def process_symptom_text(user_input: str, dataset="usmle") -> tuple:
 
     prompt = f"""
 You are a compassionate rural health assistant supporting patients in Nigeria, especially in remote areas.
+Address the patient with "Dear Patient".
 
 When someone shares their symptoms with you:
 

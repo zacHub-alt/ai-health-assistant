@@ -6,6 +6,9 @@ import tempfile
 import requests
 import folium
 from streamlit_folium import st_folium
+from utils.image_inference import detect_skin_condition
+
+
 
 from streamlit_javascript import st_javascript
 
@@ -46,14 +49,14 @@ with st.form("symptom_form"):
 
 if submit_text and user_input:
     with st.spinner("🧠 Thinking..."):
-        result, top_pharmacies = process_symptom_text(user_input, dataset=dataset_choice)
-        st.markdown("### 💡 AI Advice")
+        result, _ = process_symptom_text(user_input, dataset=dataset_choice)  # Process the input text
+        st.markdown("### 💡 AI Advice from Text Input")
         st.success(result)
 
         st.session_state["ai_response"] = result
-        st.session_state["map_results"] = top_pharmacies
-        if top_pharmacies:
-            st.session_state["location_coords"] = (top_pharmacies[0]["lat"], top_pharmacies[0]["lng"])
+
+
+
 # --- Voice Input ---
 st.subheader("🎤 Or Record Your Voice")
 audio = mic_recorder(start_prompt="🎙️ Start Recording", stop_prompt="⏹️ Stop Recording", key="voice_input")
@@ -87,36 +90,61 @@ if audio:
                     text = response.json().get("text", "")
                     st.markdown(f"🗣️ **You said:** `{text}`")
 
-                    if text and "ai_response" not in st.session_state:
+                    if text:
                         with st.spinner("🔬 Analyzing symptoms..."):
-                            result, top_pharmacies = process_symptom_text(text, dataset=dataset_choice)
+                            result, _ = process_symptom_text(text, dataset=dataset_choice)
                             st.session_state["ai_response"] = result
-                    elif not text:
+                            st.markdown("💡 **AI Advice from Voice Input:**")
+                            st.success(result)
+                    else:
                         st.warning("⚠️ No speech detected.")
-
                 else:
                     st.error(f"❌ Transcription failed: {response.text}")
 
             except Exception as e:
                 st.error(f"🚨 Error during transcription: {e}")
 
-# ✅ Show the AI response if stored (even after rerun)
-if "ai_response" in st.session_state:
-    st.markdown("💡 **AI Advice:**")
-    st.success(st.session_state["ai_response"])
-
 # 🔁 Retake recording: clears AI result and re-runs app
 if st.button("🔁 Retake Recording"):
     st.session_state.pop("ai_response", None)
     st.rerun()
 
-# --- Image Input ---
+# --- Image Input + Detection + MedGPT Advice ---
+from utils.image_inference import detect_skin_condition
+from utils.medgpt_pipeline import process_symptom_text
+from PIL import Image
+import streamlit as st
+
 st.subheader("🖼️ Photo of Affected Area")
 image = st.camera_input("Take a photo") or st.file_uploader("Or upload an image", type=["jpg", "png"])
 
 if image:
-    st.image(Image.open(image), caption="Input Image", use_column_width=True)
-    st.info("✅ Image received. Inference will run here once models are connected.")
+    img_pil = Image.open(image).convert("RGB")
+    st.image(img_pil, caption="📷 Original Input", use_container_width=True)
+
+    with st.spinner("🔍 Running visual diagnosis..."):
+        try:
+            source, vision_outputs = detect_skin_condition(image.getvalue())
+            st.markdown(f"✅ Vision model used: `{source}`")
+
+            for result in vision_outputs:
+                st.markdown("### 🧠 Visual Analysis")
+                st.info(result["query"])
+
+                st.markdown("### 🧬 MedGPT Advice")
+            with st.spinner("💡 Generating advice using MedGPT..."):
+                 advice_prompt = (
+                    f"A patient submitted an image. The AI vision system described it as: \"{result['query']}\".\n\n"
+                    "Based on this clinical description, provide a diagnosis if possible, recommended treatments or medications, "
+                    "home care steps, and whether they need to see a doctor. Use clear and medically sound guidance. Do not ask follow-up questions."
+                 )
+                 medgpt_response, _ = process_symptom_text(advice_prompt)
+                 st.success(medgpt_response)
+
+
+        except Exception as e:
+            st.error(f"🚫 Detection failed: {e}")
+
 
 # --- Single Final Map ---
 st.markdown("### 🗺️ Nearby Medical Help")
