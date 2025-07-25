@@ -174,30 +174,32 @@ if image:
                 st.info(result["query"])
 
                 st.markdown("### 🧬 MedGPT Advice")
-            with st.spinner("💡 Generating advice using MedGPT..."):
-                 # Prepare prompt
-advice_prompt = (
-    f"A patient submitted an image. The AI vision system described it as: \"{result['query']}\".\n\n"
-    "Based on this clinical description, provide a diagnosis if possible, recommended treatments or medications, "
-    "home care steps, and whether they need to see a doctor. Use clear and medically sound guidance. Do not ask follow-up questions."
-)
 
-# AI processing
-try:
-    medgpt_response, _ = process_symptom_text(advice_prompt)
-    st.session_state["image_response"] = medgpt_response
-    st.success(medgpt_response)
+                # --- FIXED INDENTATION STARTS HERE ---
+                with st.spinner("💡 Generating advice using MedGPT..."):
+                    # Prepare prompt
+                    advice_prompt = (
+                        f"A patient submitted an image. The AI vision system described it as: \"{result['query']}\".\n\n"
+                        "Based on this clinical description, provide a diagnosis if possible, recommended treatments or medications, "
+                        "home care steps, and whether they need to see a doctor. Use clear and medically sound guidance. Do not ask follow-up questions."
+                    )
 
-except Exception as e:
-    st.error(f"🚫 Detection failed: {e}")
+                    # AI processing
+                    try:
+                        medgpt_response, _ = process_symptom_text(advice_prompt)
+                        st.session_state["image_response"] = medgpt_response
+                        st.success(medgpt_response)
 
-# Button to read aloud (if available)
-if "image_response" in st.session_state and st.session_state["image_response"]:
-    if st.button("🔊 Read Aloud", key="read_image"):
-        if callable(globals().get("speak_text")):
-            speak_text(st.session_state["image_response"])
-        else:
-            st.warning("Speech function not available.")
+                    except Exception as e:
+                        st.error(f"🚫 Detection failed: {e}")
+
+                    # Button to read aloud (if available)
+                    if "image_response" in st.session_state and st.session_state["image_response"]:
+                        if st.button("🔊 Read Aloud", key="read_image"):
+                            if callable(globals().get("speak_text")):
+                                speak_text(st.session_state["image_response"])
+                            else:
+                                st.warning("Speech function not available.")
 
 # --- Single Final Map ---
 st.markdown("### 🗺️ Nearby Medical Help")
