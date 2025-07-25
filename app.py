@@ -14,6 +14,38 @@ from streamlit_javascript import st_javascript
 
 st.set_page_config(page_title="AI Health Assistant", layout="centered")
 
+def speak_text(text):
+    wuth st.spinner("🎧 Generating speech...")
+        try:
+            headers = {
+                "Autherization": f"Bearer {st.secrets.get('GROQ_API_KEY')}",
+                "Content-Type": "application/json"
+            }
+
+            payload = {
+                "model": "playai-tts",
+                "input": text.
+                "voice":  "Artisa-PlayAI"
+            }
+     
+            response = requests.post(
+           "https://api.groq.com/openai/v1/audio/speech",
+                 headers=headers,
+                 json=payload
+             }
+             if response.status_code == 200:
+                 with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_audio:
+                   temp_audio.write(response.content)
+                     st.audio(tmp_audio.name, format="audio/mp3")
+                     st.success("🔊Playing audio...")
+             else:
+                 st.error(f"TTS failed: {response.text}")
+          except Exception as e:
+              st.error(f" Error during TTS: {e}")
+
+                        
+
+
 # Get user's geolocation from browser
 coords = st_javascript("""
 navigator.geolocation.getCurrentPosition(
