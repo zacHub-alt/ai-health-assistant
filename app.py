@@ -180,14 +180,15 @@ if image:
                     "Based on this clinical description, provide a diagnosis if possible, recommended treatments or medications, "
                     "home care steps, and whether they need to see a doctor. Use clear and medically sound guidance. Do not ask follow-up questions."
                  )
-                 medgpt_response, _ = process_symptom_text(advice_prompt)
+                 try:
+    medgpt_response, _ = process_symptom_text(advice_prompt)
     st.session_state["image_response"] = medgpt_response
     st.success(medgpt_response)
 
 except Exception as e:
     st.error(f"🚫 Detection failed: {e}")
 
-# Button to read aloud
+# Outside try/except
 if "image_response" in st.session_state and st.session_state["image_response"]:
     if st.button("🔊 Read Aloud", key="read_image"):
         speak_text(st.session_state["image_response"])
