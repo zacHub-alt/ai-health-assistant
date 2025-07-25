@@ -156,6 +156,8 @@ from utils.image_inference import detect_skin_condition
 from utils.medgpt_pipeline import process_symptom_text
 from PIL import Image
 import streamlit as st
+import folium
+from streamlit_folium import st_folium
 
 st.subheader("🖼️ Photo of Affected Area")
 image = st.camera_input("Take a photo") or st.file_uploader("Or upload an image", type=["jpg", "png"])
@@ -174,8 +176,6 @@ if image:
                 st.info(result["query"])
 
                 st.markdown("### 🧬 MedGPT Advice")
-
-                # --- FIXED INDENTATION STARTS HERE ---
                 with st.spinner("💡 Generating advice using MedGPT..."):
                     # Prepare prompt
                     advice_prompt = (
@@ -200,6 +200,8 @@ if image:
                                 speak_text(st.session_state["image_response"])
                             else:
                                 st.warning("Speech function not available.")
+        except Exception as e:
+            st.error(f"🚫 Visual detection failed: {e}")
 
 # --- Single Final Map ---
 st.markdown("### 🗺️ Nearby Medical Help")
